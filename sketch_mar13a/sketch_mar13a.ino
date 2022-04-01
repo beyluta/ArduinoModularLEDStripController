@@ -1,8 +1,9 @@
 #include <IRremote.h>
 
 int baudRate = 9600;
-const int maxModuleCount = 2;
-const int maxColorCodes = 9;
+const int maxIRModuleCount = 2;
+const int maxIRColorCodes = 9;
+const int maxPIRModuleCount = 1;
 IRsend irsend;
 
 struct CodeDictionary
@@ -23,7 +24,7 @@ class IRModule
 public:
   const char* name;
   int size = 0;
-  CodeDictionary codes[maxColorCodes];
+  CodeDictionary codes[maxIRColorCodes];
 
   IRModule(){}
   IRModule(const char* name)
@@ -54,29 +55,69 @@ void print(const char* m)
   Serial.println(m);
 }
 
-class IRController 
+class PIRModule 
+{
+private:
+  int pirPin = 0;
+
+public: 
+  void Initialize(int pirPin)
+  {
+    this->pirPin = pirPin;
+    pinMode(pirPin, INPUT);
+  }
+
+  int GetStatus() 
+  {
+    return digitalRead(pirPin);
+  }
+};
+
+class ModulesController 
 {
 public:
-    IRModule modules[maxModuleCount];
-    int size = 0;
+    IRModule irModules[maxIRModuleCount];
+    PIRModule pirModules[maxPIRModuleCount];
+    int irModuleSize = 0;
+    int pirModuleSize = 0;
 
     void AddModule(IRModule module)
     {
-      modules[size] = module;
-      size++;
+      irModules[irModuleSize] = module;
+      irModuleSize++;
+    }
+
+    void AddModule(PIRModule module)
+    {
+      pirModules[pirModuleSize] = module;
+      pirModuleSize++;
     }
 
     void ChangeColor(const char* color)
     {
-      for (int i = 0; i < maxModuleCount; i++)
+      for (int i = 0; i < maxIRModuleCount; i++)
       {
-        irsend.sendNEC(modules[i].FindCode(color).code, 32);
+        irsend.sendNEC(irModules[i].FindCode(color).code, 32);
       }
+    }
+
+    bool DetectMotion()
+    {
+      for (int i = 0; i < maxPIRModuleCount; i++)
+      {
+        if (pirModules[i].GetStatus() == HIGH)
+        {
+          return true;
+        }
+      }
+
+      return false;
     }
 };
 
-IRController controller;
+ModulesController controller;
 IRModule ceilingModule("Ceiling Module");
+PIRModule frontDoorModule;
 
 void setup() 
 {
@@ -91,10 +132,22 @@ void setup()
   ceilingModule.AddCode(CodeDictionary("pink", 0xF76897));
   ceilingModule.AddCode(CodeDictionary("off", 0xF740BF));
   ceilingModule.AddCode(CodeDictionary("on", 0xF7C03F));
+
+  frontDoorModule.Initialize(2);
+  controller.AddModule(frontDoorModule);
   controller.AddModule(ceilingModule);
 }
 
 void loop() 
 {
-  controller.ChangeColor("purple");
+  if (controller.DetectMotion())
+  {
+    controller.ChangeColor("off");
+    print("Motion detected");
+  }
+  else
+  {
+    controller.ChangeColor("on");
+    print("Motion no motion detected");
+  }
 }
