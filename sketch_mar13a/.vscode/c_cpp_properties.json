@@ -19,6 +19,8 @@
                 "D:\\Arduino\\hardware\\arduino\\avr\\cores\\arduino",
                 "D:\\Arduino\\hardware\\arduino\\avr\\variants\\standard",
                 "C:\\Users\\Beyluta\\Documents\\Arduino\\libraries\\IRremote\\src",
+                "D:\\Arduino\\hardware\\arduino\\avr\\libraries\\Wire\\src",
+                "C:\\Users\\Beyluta\\Documents\\Arduino\\libraries\\DS3231",
                 "d:\\arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\7.3.0\\include",
                 "d:\\arduino\\hardware\\tools\\avr\\lib\\gcc\\avr\\7.3.0\\include-fixed",
                 "d:\\arduino\\hardware\\tools\\avr\\avr\\include"
