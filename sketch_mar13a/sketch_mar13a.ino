@@ -1,6 +1,9 @@
 #include <IRremote.h>
 #include <Wire.h>
 #include <DS3231.h>
+#include <SoftwareSerial.h>
+
+#define SEMANTIC_VERSION "v1.0.0"
 
 /*
 ** Adjust these variables to suit your needs.
@@ -10,6 +13,7 @@ const int maxIRModuleCount  = 2;
 const int maxIRColorCodes   = 9;
 const int maxPIRModuleCount = 1;
 const int maxRTCModuleCount = 1;
+SoftwareSerial ATDevice(5, 4); //RX, TX pins for the WiFi module: comment out if you don't need it
 IRsend irsend;
 DS3231 rtc;
 
@@ -73,7 +77,7 @@ private:
   int pirPin = 0;
 
 public: 
-  void Initialize(int pirPin)
+  void SetDefaultPin(int pirPin)
   {
     this->pirPin = pirPin;
     pinMode(pirPin, INPUT);
@@ -146,7 +150,7 @@ public:
 
 class ModulesController 
 {
-public:
+private:
     IRModule irModules[maxIRModuleCount];
     PIRModule pirModules[maxPIRModuleCount];
     RTCModule rtcModules[maxRTCModuleCount];
@@ -154,6 +158,7 @@ public:
     int pirModuleSize = 0;
     int rtcModuleSize = 0;
 
+public:
     void AddModule(IRModule module)
     {
       irModules[irModuleSize] = module;
@@ -212,6 +217,29 @@ public:
     }
 };
 
+String SetATCommand(const char *toSend, unsigned long milliseconds = 500) 
+{
+  String result;
+  Serial.print("Sending: ");
+  Serial.println(toSend);
+  ATDevice.println(toSend);
+  unsigned long startTime = millis();
+  Serial.print("Received: ");
+  
+  while (millis() - startTime < milliseconds) 
+  {
+    if (ATDevice.available()) 
+    {
+      char c = ATDevice.read();
+      Serial.write(c);
+      result += c;
+    }
+  }
+
+Serial.println();
+return result;
+}
+
 /*
 **  The code below can be modified to suit your needs.
 **  The default values are for my setup.
@@ -219,35 +247,41 @@ public:
 **  Avoid modifying the code above unless you know what you are doing.
 */
 ModulesController controller;
-IRModule ceilingModule("Ceiling Module");
-PIRModule frontDoorModule;
+IRModule irCeilingModule("Ceiling Module");
+PIRModule pirDoorModule;
 RTCModule rtcModule;
 
 // Executes once at the beginning of the program.
 void setup() 
 {
-  Serial.begin(baudRate); 
+  Serial.begin(baudRate);
   Wire.begin();
+  ATDevice.begin(baudRate);
+  SetATCommand("AT+CIPMUX=1");
+  SetATCommand("AT+CIPSERVER=1,8225");
+  Serial.println("Arduino UNO running RinTerminal " + String(SEMANTIC_VERSION));
 
-  ceilingModule.AddCode(CodeDictionary("white", 0xF7E01F));
-  ceilingModule.AddCode(CodeDictionary("green", 0xF7A05F));
-  ceilingModule.AddCode(CodeDictionary("blue", 0xF7609F));
-  ceilingModule.AddCode(CodeDictionary("red", 0xF720DF));
-  ceilingModule.AddCode(CodeDictionary("orange", 0xF710EF));
-  ceilingModule.AddCode(CodeDictionary("purple", 0xF750AF));
-  ceilingModule.AddCode(CodeDictionary("pink", 0xF76897));
-  ceilingModule.AddCode(CodeDictionary("off", 0xF740BF));
-  ceilingModule.AddCode(CodeDictionary("on", 0xF7C03F));
+  irCeilingModule.AddCode(CodeDictionary("white", 0xF7E01F));
+  irCeilingModule.AddCode(CodeDictionary("green", 0xF7A05F));
+  irCeilingModule.AddCode(CodeDictionary("blue", 0xF7609F));
+  irCeilingModule.AddCode(CodeDictionary("red", 0xF720DF));
+  irCeilingModule.AddCode(CodeDictionary("orange", 0xF710EF));
+  irCeilingModule.AddCode(CodeDictionary("purple", 0xF750AF));
+  irCeilingModule.AddCode(CodeDictionary("pink", 0xF76897));
+  irCeilingModule.AddCode(CodeDictionary("off", 0xF740BF));
+  irCeilingModule.AddCode(CodeDictionary("on", 0xF7C03F));
 
-  frontDoorModule.Initialize(2);
-  controller.AddModule(frontDoorModule);
-  controller.AddModule(ceilingModule);
+  pirDoorModule.SetDefaultPin(2);
+  controller.AddModule(pirDoorModule);
+  controller.AddModule(irCeilingModule);
   controller.AddModule(rtcModule);
 }
 
-// Loops as the program executes.
+// Runs repeatedly throughout the program's lifecycle.
 void loop() 
 {
-  print(controller.GetFromRTC(0, RTCModule::HOUR));
-  delay(1000);
+  if (ATDevice.available())
+  {
+    Serial.println(ATDevice.readString());
+  }
 }
